@@ -1,0 +1,122 @@
+.common{
+    /* border: 2px solid white;  */
+    position: absolute;
+    
+ }
+ .nav{
+     position: relative;
+     float: right;
+     font-size: 100%;
+     padding-top: 10px;
+ }
+ .footer{
+     position: fixed;
+     bottom: 0px;
+     left: 0px;
+     right:0px;
+     font-size: 75%;
+     font-style: italic;
+     text-align: center;
+     background-color: hsla(0, 0%, 66%, 0.5);
+ }
+ .header{
+     top: 0px;
+     left: 0px;
+     right:0px;
+     text-align: center;
+     font-size: 150%;
+     z-index: -1;
+ }
+
+ .subheader{
+    top: 75px;
+    left: 0px;
+    right:0px;
+    text-align: center;
+    font-size: 100%;
+    z-index: -1;
+ }
+ .content{
+     top: 150px;
+     left: 10%;
+     right:10%;
+     bottom: 1px;
+     /* bottom:30px; */
+     /* background-color: rgba(129, 136, 138, 0.278) */
+ }
+ .content2.0{
+    top: 150px;
+    left: 10%;
+    right:10%;
+    bottom:30px;
+ }
+.paragraph{
+    left: 0%;
+    right: 50%;
+}
+
+ .center-img{
+    text-align: right;
+    right:1%;
+    top: 20%;
+ }
+
+ .center-img img{
+    display: inline-block;
+ }
+
+ .center-list{
+    left:20%;
+    right:25%;
+ }
+
+ .spaced-list{
+    line-height: 1.5;
+    /* s */
+ }
+ 
+ .two-column-list{
+    column-count: 2;
+    column-gap: 20px;   
+ }
+ 
+
+  .video-row {
+    display: flex;
+    justify-content: space-around; /* or use space-between or center */
+    flex-wrap: wrap; /* allows wrapping on smaller screens */
+    gap: 20px;
+    padding: 20px;
+  }
+  
+  .video-wrapper {
+    position: relative;
+    width: 25%; /* adjust for spacing */
+    padding-bottom: 16.9%; /* 16:9 ratio */
+    height: 0;
+  }
+  
+  .video-wrapper iframe {
+    position:absolute;
+    top: 117vh;
+    left:60%;
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+
+  .tableu-center{
+    position: absolute;
+    text-align: center;
+  }
+
+  .special-p{
+    padding-left: 50%; /* Space inside the element */
+    margin-left: 50px;  /* Space outside the element */
+    text-align:center ;
+  }
+        
+.background-exp{
+    background-color: rgba(128, 128, 128, 0.245);
+}
+

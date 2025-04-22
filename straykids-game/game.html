@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stray Kids Matching Game</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@900&display=swap" rel="stylesheet">
+    <style>
+        /* Basic perspective for card flip */
+        .game-board {
+            perspective: 1000px;
+        }
+
+        /* Individual card styling */
+        .card {
+            position: relative;
+            transition: transform 0.6s;
+            transform-style: preserve-3d;
+            cursor: pointer;
+            aspect-ratio: 1 / 1; /* Make cards square */
+            border-radius: 0.5rem; /* Rounded corners */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Front (hidden) and Back (visible) faces */
+        .card-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden; /* Hide the back side when facing away */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 0.5rem; /* Match card rounding */
+            overflow: hidden; /* Keep image corners rounded */
+        }
+
+        .card-front {
+            background-color: #ffffff; /* Default white background (will be overridden for names) */
+            transform: rotateY(180deg); /* Initially hidden */
+            color: #1f2937; /* Dark text for names */
+            font-weight: bold;
+            font-size: calc(0.6rem + 1vw); /* Responsive font size */
+            text-align: center;
+            padding: 0.25rem;
+        }
+
+        /* Ensure name doesn't wrap awkwardly */
+        .card-front:not(:has(img)) {
+             line-height: 1.2;
+        }
+
+        /* Updated Card Back */
+        .card-back {
+            background-color: #000000; /* Black background */
+            color: #ffffff; /* White text */
+            font-family: 'Nunito', sans-serif; /* Use a rounded, bold font */
+            font-size: calc(1.5rem + 2vw); /* Larger, responsive font size */
+            font-weight: 900; /* Extra bold */
+            text-shadow: 2px 2px 4px rgba(255, 255, 255, 0.3); /* Subtle text shadow */
+        }
+
+        /* Flip the card when .is-flipped is added */
+        .card.is-flipped {
+            transform: rotateY(180deg);
+        }
+
+        /* Styling for matched cards */
+        .card.matched {
+            opacity: 0.3; /* Fade out */
+            cursor: default;
+            transform: scale(0.95); /* Slightly shrink */
+            transition: opacity 0.5s ease 0.3s, transform 0.5s ease 0.3s; /* Add delay to fade/shrink */
+        }
+
+        /* Shake animation */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) rotateY(180deg); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px) rotateY(180deg); }
+            20%, 40%, 60%, 80% { transform: translateX(5px) rotateY(180deg); }
+        }
+
+        .card.shake {
+            animation: shake 0.5s ease-in-out;
+        }
+
+        /* Red border/tint for incorrect */
+        .card.incorrect .card-front {
+            border: 3px solid #ef4444; /* Red-500 border */
+            box-shadow: inset 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+
+        /* Ensure images cover the card face */
+        .card-front img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Level Selection Screen */
+        #level-selection {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        /* Hide elements initially */
+        .hidden-initially {
+            display: none;
+        }
+
+        /* Message Overlay */
+        #message-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85); /* Slightly darker overlay */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+            z-index: 10;
+            padding: 1rem; /* Add padding to overlay */
+            overflow-y: auto; /* Allow scrolling if content overflows */
+        }
+        #message-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #message-overlay .overlay-content {
+             background-color: white;
+             padding: 1.5rem; /* Increased padding */
+             border-radius: 0.5rem;
+             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+             max-width: 90%; /* Limit width */
+             max-height: 90vh; /* Limit height */
+             overflow-y: auto; /* Scroll inside the white box */
+        }
+        #message-overlay button {
+             margin: 0.5rem 0.5rem 0 0.5rem; /* Adjust margin */
+        }
+
+        /* Styles for Matched Pairs Display */
+        #matched-pairs-display {
+            margin-top: 1.5rem; /* Space above the display */
+            border-top: 1px solid #e5e7eb; /* Separator line */
+            padding-top: 1rem;
+        }
+        #matched-pairs-display h3 {
+            font-size: 1.1rem;
+            font-weight: bold;
+            color: #374151; /* Gray-700 */
+            margin-bottom: 1rem;
+        }
+        .matched-pair-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); /* Responsive grid */
+            gap: 0.75rem; /* Gap between items */
+            justify-items: center;
+        }
+        .matched-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+        .matched-item img {
+            width: 60px; /* Size of the small photo */
+            height: 60px;
+            object-fit: cover;
+            border-radius: 0.375rem; /* Rounded corners */
+            margin-bottom: 0.25rem; /* Space below photo */
+            border: 1px solid #d1d5db; /* Light border */
+        }
+        .matched-item span {
+            font-size: 0.8rem; /* Smaller font for name */
+            font-weight: 600;
+            color: #4b5563; /* Gray-600 */
+        }
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-100 to-purple-200 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+
+    <h1 class="text-3xl font-bold text-gray-800 mb-4">Stray Kids Matching Game</h1>
+
+    <div id="level-selection">
+        <h2 class="text-2xl font-semibold text-gray-700 mb-3">Choose Difficulty:</h2>
+        <button data-time="90" class="level-button bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition-colors duration-200">Easy (1:30)</button>
+        <button data-time="60" class="level-button bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded transition-colors duration-200">Medium (1:00)</button>
+        <button data-time="30" class="level-button bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition-colors duration-200">Hard (0:30)</button>
+    </div>
+
+    <div id="game-area" class="hidden-initially w-full max-w-xl flex flex-col items-center">
+        <div class="status-bar flex justify-between w-full mb-4 text-xl font-semibold text-gray-700">
+            <div id="timer">Time Left: --s</div>
+            <div id="score">Score: 0</div>
+        </div>
+        <div id="game-board" class="game-board grid grid-cols-4 gap-2 md:gap-3 w-full">
+            </div>
+    </div>
+
+    <div id="message-overlay">
+        <div class="overlay-content text-gray-800">
+            <h2 id="message-title" class="text-2xl font-bold mb-4">Time's Up!</h2>
+            <p id="message-body" class="text-lg mb-6">Your score: 0</p>
+
+            <div id="matched-pairs-display" style="display: none;"> <h3>You Matched:</h3>
+                 <div class="matched-pair-grid">
+                     </div>
+            </div>
+            <div>
+                <button id="restart-button" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition-colors duration-200">
+                    Play Again
+                </button>
+                 <button id="change-level-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-6 rounded transition-colors duration-200">
+                    Change Level
+                </button>
+            </div>
+        </div>
+        </div>
+    <script>
+        // --- DOM Elements ---
+        const gameBoard = document.getElementById('game-board');
+        const scoreDisplay = document.getElementById('score');
+        const timerDisplay = document.getElementById('timer');
+        const messageOverlay = document.getElementById('message-overlay');
+        const messageTitle = document.getElementById('message-title');
+        const messageBody = document.getElementById('message-body');
+        const restartButton = document.getElementById('restart-button');
+        const changeLevelButton = document.getElementById('change-level-button');
+        const levelSelectionDiv = document.getElementById('level-selection');
+        const gameAreaDiv = document.getElementById('game-area');
+        const levelButtons = document.querySelectorAll('.level-button');
+        const matchedPairsDisplay = document.getElementById('matched-pairs-display');
+        const matchedPairGrid = matchedPairsDisplay.querySelector('.matched-pair-grid');
+
+        // --- Game Constants ---
+        const MEMBERS = ["Bangchan", "Leeknow", "Changbin", "Hyunjin", "Han", "Felix", "Seungmin", "I.N."];
+        const TOTAL_CARDS = MEMBERS.length * 2;
+        const TOTAL_PAIRS = MEMBERS.length;
+        const PLACEHOLDER_IMAGE_URL = 'https://placehold.co/100x100/e2e8f0/475569?text=SKZ';
+        const MEMBER_IMAGES = {
+            "Bangchan": ["https://i.pinimg.com/736x/60/5e/c4/605ec4ab3ebe679c8d13a333dcde6151.jpg", "https://i.pinimg.com/736x/3f/a4/99/3fa4991c84f4cd43517d04a3c7a7ccfe.jpg"],
+            "Leeknow": ["https://i.pinimg.com/736x/f9/23/1e/f9231e07a892657cf5d0d3a2450413c3.jpg", "https://i.pinimg.com/736x/a7/1d/8f/a71d8fe469ef5834a63d945c6f904f0c.jpg"],
+            "Changbin": ["https://i.pinimg.com/736x/78/42/22/78422212e499e3f68d545373de16ebaf.jpg", "https://i.pinimg.com/736x/a4/42/ce/a442ce9be2e3cbca159c72c1b3b4f56f.jpg"],
+            "Hyunjin": ["https://i.pinimg.com/736x/4b/b0/7c/4bb07cbb3f76faff45d252352b0ddc22.jpg", "https://i.pinimg.com/736x/d0/fc/55/d0fc552b77c4cc761c671c2f92ce07db.jpg"],
+            "Han": ["https://i.pinimg.com/736x/48/ea/25/48ea257bb307142c748f9d6fe4785ea1.jpg", "https://i.pinimg.com/736x/7e/0f/c0/7e0fc0a531254d8fee73adcb59bf817b.jpg"],
+            "Felix": ["https://i.pinimg.com/736x/fc/f8/e9/fcf8e9c19c04480509f47625fe8fe39a.jpg", "https://i.pinimg.com/736x/52/6d/e1/526de12296b09e7d6bb6360cadc2ad0a.jpg"],
+            "Seungmin": ["https://i.pinimg.com/736x/dd/20/0a/dd200ab99e17d340a78d33c11da824fb.jpg", "https://i.pinimg.com/736x/29/ac/1b/29ac1ba5a51f1d595b676e0521ea91f0.jpg"],
+            "I.N.": ["https://i.pinimg.com/736x/80/1c/b1/801cb17aeeec6a41f1d357014caa0f99.jpg", "https://i.pinimg.com/736x/34/98/18/349818457cd4f9aa43a00301ce31a7df.jpg"]
+        };
+        const CORRECT_MATCH_DELAY = 800;
+        const NAME_CARD_COLORS = ['#a7f3d0', '#bae6fd', '#fecdd3', '#fde68a', '#d8b4fe', '#fbcfe8', '#a5f3fc', '#bbf7d0'];
+
+        // --- Game State Variables ---
+        let cards = [];
+        let firstCard = null;
+        let secondCard = null;
+        let lockBoard = false;
+        let score = 0;
+        let matchedCardsCount = 0;
+        let currentTimeLimit = 60;
+        let timeLeft = 0;
+        let timerId = null;
+        let nameCardColorIndex = 0;
+        let matchedMembers = new Set(); // To store names of matched members
+
+        // --- Functions ---
+
+        /** Shuffles array in place */
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+        }
+
+        /** Prepare the 16 card data array */
+        function prepareCardData() {
+            cards = [];
+            MEMBERS.forEach(member => {
+                const imageIndex = Math.floor(Math.random() * 2);
+                const selectedImageUrl = MEMBER_IMAGES[member][imageIndex];
+                cards.push({ member: member, type: 'photo', value: selectedImageUrl, id: `${member}-photo` });
+                cards.push({ member: member, type: 'name', value: member, id: `${member}-name` });
+            });
+        }
+
+        /** Creates and displays the card elements on the board */
+        function createBoard() {
+            gameBoard.innerHTML = '';
+            shuffle(cards);
+            nameCardColorIndex = 0;
+
+            cards.forEach((cardData) => {
+                const cardElement = document.createElement('div');
+                cardElement.classList.add('card', 'bg-gray-300');
+                cardElement.dataset.id = cardData.id;
+                cardElement.dataset.member = cardData.member;
+                cardElement.dataset.type = cardData.type;
+                cardElement.dataset.value = cardData.value;
+
+                const cardBack = document.createElement('div');
+                cardBack.classList.add('card-face', 'card-back');
+                cardBack.textContent = 'SKZ';
+
+                const cardFront = document.createElement('div');
+                cardFront.classList.add('card-face', 'card-front');
+
+                if (cardData.type === 'photo') {
+                    const img = document.createElement('img');
+                    img.src = cardData.value;
+                    img.alt = cardData.member;
+                    img.onerror = function() { this.src = PLACEHOLDER_IMAGE_URL; this.alt = 'Image load error'; };
+                    cardFront.appendChild(img);
+                } else {
+                    cardFront.textContent = cardData.value;
+                    cardFront.style.backgroundColor = NAME_CARD_COLORS[nameCardColorIndex % NAME_CARD_COLORS.length];
+                    nameCardColorIndex++;
+                }
+
+                cardElement.appendChild(cardBack);
+                cardElement.appendChild(cardFront);
+                cardElement.addEventListener('click', handleCardClick);
+                gameBoard.appendChild(cardElement);
+            });
+        }
+
+        /** Handles clicking on a card */
+        function handleCardClick(event) {
+            if (lockBoard) return;
+            const clickedCard = event.currentTarget;
+            if (clickedCard === firstCard || clickedCard.classList.contains('matched') || (clickedCard.classList.contains('is-flipped') && !clickedCard.classList.contains('matched'))) {
+                return;
+            }
+            clickedCard.classList.add('is-flipped');
+            if (!firstCard) {
+                firstCard = clickedCard;
+                return;
+            }
+            secondCard = clickedCard;
+            lockBoard = true;
+            checkForMatch();
+        }
+
+        /** Checks if the two selected cards form a valid match */
+        function checkForMatch() {
+            if (!firstCard || !secondCard) {
+                 resetBoard(); return;
+            }
+            const member1 = firstCard.dataset.member;
+            const type1 = firstCard.dataset.type;
+            const member2 = secondCard.dataset.member;
+            const type2 = secondCard.dataset.type;
+            const isMatch = member1 === member2 && type1 !== type2;
+
+            if (isMatch) {
+                correctMatch(member1); // Pass matched member name
+            } else {
+                incorrectMatch();
+            }
+        }
+
+        /** Handles a correct match */
+        function correctMatch(memberName) { // Accept member name
+            score++;
+            matchedCardsCount += 2;
+            matchedMembers.add(memberName); // Add member to the Set
+            scoreDisplay.textContent = `Score: ${score}`;
+
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 80, spread: 60, origin: { y: 0.7 } });
+            }
+
+            setTimeout(() => {
+                if (firstCard) firstCard.classList.add('matched');
+                if (secondCard) secondCard.classList.add('matched');
+                if (firstCard) firstCard.removeEventListener('click', handleCardClick);
+                if (secondCard) secondCard.removeEventListener('click', handleCardClick);
+                resetBoard();
+
+                if (matchedCardsCount === TOTAL_CARDS) {
+                    clearInterval(timerId);
+                    showEndMessage(true);
+                }
+            }, CORRECT_MATCH_DELAY);
+        }
+
+        /** Handles an incorrect match */
+        function incorrectMatch() {
+            if (!firstCard || !secondCard) {
+                resetBoard(); return;
+            }
+            firstCard.classList.add('shake', 'incorrect');
+            secondCard.classList.add('shake', 'incorrect');
+
+            setTimeout(() => {
+                if (firstCard) firstCard.classList.remove('shake', 'incorrect', 'is-flipped');
+                if (secondCard) secondCard.classList.remove('shake', 'incorrect', 'is-flipped');
+                resetBoard();
+            }, 1000);
+        }
+
+        /** Resets card selection and lock state */
+        function resetBoard() {
+            [firstCard, secondCard] = [null, null];
+            lockBoard = false;
+        }
+
+        /** Starts the game timer */
+        function startTimer() {
+            clearInterval(timerId);
+            timeLeft = currentTimeLimit;
+            timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+            timerId = setInterval(updateTimer, 1000);
+        }
+
+        /** Updates the timer display and checks for time up */
+        function updateTimer() {
+            timeLeft--;
+            timerDisplay.textContent = `Time Left: ${timeLeft}s`;
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }
+
+        /** Ends the game when time runs out */
+        function endGame() {
+            clearInterval(timerId);
+            lockBoard = true;
+            showEndMessage(false);
+        }
+
+        /** Shows the end game message overlay and matched pairs */
+        function showEndMessage(isWin) {
+             // Display Matched Pairs
+            matchedPairGrid.innerHTML = ''; // Clear previous display
+            if (matchedMembers.size > 0) {
+                matchedPairsDisplay.style.display = 'block'; // Show the container
+                const sortedMembers = Array.from(matchedMembers).sort();
+                sortedMembers.forEach(member => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.classList.add('matched-item');
+
+                    const img = document.createElement('img');
+                    img.src = MEMBER_IMAGES[member][0]; // Display the first image
+                    img.alt = member;
+                    img.onerror = function() { this.src = PLACEHOLDER_IMAGE_URL; this.alt = 'Image load error'; };
+
+                    const nameSpan = document.createElement('span');
+                    nameSpan.textContent = member;
+
+                    itemDiv.appendChild(img);
+                    itemDiv.appendChild(nameSpan);
+                    matchedPairGrid.appendChild(itemDiv);
+                });
+            } else {
+                matchedPairsDisplay.style.display = 'none'; // Hide if no matches
+            }
+
+            // Set main message title and body
+            if (isWin || matchedCardsCount === TOTAL_CARDS) {
+                messageTitle.textContent = "Congratulations!";
+                messageBody.textContent = `You matched all ${TOTAL_PAIRS} pairs! Final Score: ${score}`;
+            } else {
+                messageTitle.textContent = "Time's Up!";
+                let encouragement = score < TOTAL_PAIRS ? " You can do better next time!" : " Great effort!";
+                messageBody.textContent = `Your score: ${score} out of ${TOTAL_PAIRS}.${encouragement}`;
+            }
+            messageOverlay.classList.add('show'); // Show the entire overlay
+        }
+
+        /** Shows the level selection screen */
+        function showLevelSelection() {
+            gameAreaDiv.style.display = 'none';
+            messageOverlay.classList.remove('show');
+            levelSelectionDiv.style.display = 'flex';
+        }
+
+        /** Initializes or restarts the game */
+        function startGame(timeLimit) {
+            currentTimeLimit = timeLimit;
+            score = 0;
+            matchedCardsCount = 0;
+            matchedMembers.clear(); // Clear the matched members Set
+            firstCard = null;
+            secondCard = null;
+            lockBoard = false;
+            scoreDisplay.textContent = `Score: ${score}`;
+            messageOverlay.classList.remove('show');
+            levelSelectionDiv.style.display = 'none';
+            gameAreaDiv.style.display = 'flex';
+            gameAreaDiv.classList.remove('hidden-initially');
+
+            prepareCardData();
+            createBoard();
+            startTimer();
+        }
+
+        // --- Event Listeners ---
+        levelButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const time = parseInt(button.dataset.time, 10);
+                startGame(time);
+            });
+        });
+        restartButton.addEventListener('click', () => startGame(currentTimeLimit));
+        changeLevelButton.addEventListener('click', showLevelSelection);
+
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+             gameAreaDiv.style.display = 'none';
+             levelSelectionDiv.style.display = 'flex';
+        });
+
+    </script>
+
+</body>
+</html>
